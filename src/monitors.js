@@ -11,7 +11,7 @@
 
 const { EventEmitter } = require('events');
 const store = require('./store');
-const { fetchRecentStories } = require('./hn');
+const { getRecentStories } = require('./hn');
 const { runClaude } = require('./claude');
 
 class MonitorManager extends EventEmitter {
@@ -52,7 +52,9 @@ class MonitorManager extends EventEmitter {
 
     this.emit('status', { monitorId, state: 'running' });
     try {
-      const stories = await fetchRecentStories(30);
+      // Shared 5-minute cache: monitors ticking within the window reuse one
+      // fetch, so API calls stay flat no matter how many monitors there are.
+      const stories = await getRecentStories(30);
 
       // Only bother Claude with stories we haven't already filed away.
       const unseen = stories.filter((s) => store.isNew(s.hnId));

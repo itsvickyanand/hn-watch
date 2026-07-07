@@ -79,6 +79,17 @@ survivors plus the user's prompt to `claude -p --output-format json` → parse t
 JSON list of `{hnId, summary}` picks → save and notify. Sending only unseen
 stories keeps prompts small and cheap.
 
+### Shared HN fetch cache (scales to many monitors)
+All monitors read Hacker News through one cache in `src/hn.js` with a **5-minute
+TTL**. Any monitor ticking within that window reuses the same fetched stories,
+so API calls stay flat no matter how many monitors you have — 50 monitors hit
+the API roughly **once per 5 minutes**, not 50 times. Concurrent ticks that find
+the cache stale are **coalesced** into a single in-flight request (they await
+the same fetch instead of each firing their own), and a transient API failure
+falls back to the last good data. Only the `claude -p` judgments scale with
+monitor count (unavoidable — each has a different prompt), and those are already
+throttled by the shared concurrency queue.
+
 ### The swarm (dig deeper)
 `src/swarm.js` launches one streaming agent per angle (What/who, Landscape,
 Skeptic, Why-it-matters) using `--output-format stream-json`. Their text streams
