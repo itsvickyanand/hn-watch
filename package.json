@@ -1,0 +1,14 @@
+{
+  "name": "hn-watch",
+  "version": "0.1.0",
+  "description": "Watch Hacker News for topics you describe in plain English, judged by Claude.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

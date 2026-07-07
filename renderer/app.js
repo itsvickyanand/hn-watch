@@ -1,0 +1,168 @@
+// app.js — the UI logic. Talks to the backend only through `window.api`
+// (defined in preload.js). Plain DOM, no framework.
+
+const $ = (id) => document.getElementById(id);
+
+// Local mirrors of backend state, kept just for rendering.
+let monitors = [];
+let feed = [];
+const statusById = {}; // monitorId -> 'running' | 'idle' | 'error'
+
+// ---------- boot ----------
+init();
+async function init() {
+  const state = await window.api.getState();
+  monitors = state.monitors;
+  feed = state.feed;
+  renderMonitors();
+  renderFeed();
+
+  // Live updates pushed from the backend:
+  window.api.onFeedNew(({ items }) => {
+    feed = [...items, ...feed]; // newest first
+    renderFeed();
+  });
+  window.api.onMonitorStatus(({ monitorId, state }) => {
+    statusById[monitorId] = state;
+    renderMonitors();
+  });
+  window.api.onSwarmEvent(handleSwarmEvent);
+}
+
+// ---------- create / remove monitors ----------
+$('monitor-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const prompt = $('prompt').value.trim();
+  const intervalMinutes = Number($('interval').value) || 30;
+  if (!prompt) return;
+  const monitor = await window.api.addMonitor({ prompt, intervalMinutes });
+  monitors = [...monitors, monitor];
+  $('prompt').value = '';
+  renderMonitors();
+});
+
+async function removeMonitor(id) {
+  await window.api.removeMonitor(id);
+  monitors = monitors.filter((m) => m.id !== id);
+  feed = feed.filter((f) => f.monitorId !== id);
+  renderMonitors();
+  renderFeed();
+}
+
+// ---------- rendering ----------
+function renderMonitors() {
+  const ul = $('monitors');
+  ul.innerHTML = '';
+  if (monitors.length === 0) {
+    ul.innerHTML = '<li class="empty" style="padding:0">No monitors yet.</li>';
+    return;
+  }
+  for (const m of monitors) {
+    const li = document.createElement('li');
+    li.className = 'monitor';
+    const state = statusById[m.id] || 'idle';
+    li.innerHTML = `
+      <div class="row">
+        <div class="prompt">${escapeHtml(m.prompt)}</div>
+        <button class="remove" title="Remove">✕</button>
+      </div>
+      <div class="meta">
+        <span class="dot ${state}"></span>${state} · every ${m.intervalMinutes}m
+      </div>`;
+    li.querySelector('.remove').addEventListener('click', () =>
+      removeMonitor(m.id)
+    );
+    ul.appendChild(li);
+  }
+}
+
+function renderFeed() {
+  const el = $('feed');
+  $('feed-empty').classList.toggle('hidden', feed.length > 0);
+  el.innerHTML = '';
+  for (const item of feed) {
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.innerHTML = `
+      <a class="title" href="${item.url}" target="_blank" rel="noreferrer">
+        ${escapeHtml(item.title)}
+      </a>
+      <div class="summary">${escapeHtml(item.summary || '')}</div>
+      <div class="footer">
+        <span>▲ ${item.points ?? 0}</span>
+        <span>💬 ${item.comments ?? 0}</span>
+        <button class="dig">Dig deeper</button>
+      </div>`;
+    div.querySelector('.dig').addEventListener('click', () => digDeeper(item));
+    el.appendChild(div);
+  }
+}
+
+// ---------- swarm ----------
+let currentSwarmId = null;
+
+async function digDeeper(item) {
+  openSwarm(item.title);
+  const res = await window.api.startSwarm(item.id);
+  if (res.error) {
+    $('swarm-title').textContent = `Error: ${res.error}`;
+    return;
+  }
+  currentSwarmId = res.swarmId;
+  // Pre-create a panel for each angle so the user sees the whole team.
+  const container = $('swarm-agents');
+  container.innerHTML = '';
+  for (const a of res.angles) {
+    const div = document.createElement('div');
+    div.className = 'agent';
+    div.id = `agent-${res.swarmId}-${a.id}`;
+    div.innerHTML = `
+      <div class="head"><span class="dot running"></span>${escapeHtml(
+        a.angle
+      )}</div>
+      <div class="body"></div>`;
+    container.appendChild(div);
+  }
+}
+
+function handleSwarmEvent(evt) {
+  if (evt.swarmId !== currentSwarmId) return; // ignore stale swarms
+  const agentEl = $(`agent-${evt.swarmId}-${evt.agentId}`);
+  switch (evt.type) {
+    case 'agent-chunk':
+      if (agentEl) agentEl.querySelector('.body').textContent += evt.text;
+      break;
+    case 'agent-done':
+      if (agentEl) agentEl.querySelector('.dot').classList.remove('running');
+      break;
+    case 'brief':
+      $('swarm-brief').classList.remove('hidden');
+      $('swarm-brief-body').textContent = evt.text;
+      $('swarm-title').textContent = 'Dig deeper — done';
+      break;
+    case 'error':
+      $('swarm-title').textContent = `Error: ${evt.message}`;
+      break;
+  }
+}
+
+function openSwarm(title) {
+  $('swarm-title').textContent = `Digging deeper: ${title}`;
+  $('swarm-brief').classList.add('hidden');
+  $('swarm-brief-body').textContent = '';
+  $('swarm-agents').innerHTML = '';
+  $('swarm-overlay').classList.remove('hidden');
+}
+$('swarm-close').addEventListener('click', () => {
+  $('swarm-overlay').classList.add('hidden');
+  currentSwarmId = null;
+});
+
+// ---------- util ----------
+function escapeHtml(s) {
+  return String(s).replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+  );
+}

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HN Watch</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- LEFT: create + manage monitors -->
+      <aside class="sidebar">
+        <h1>HN&nbsp;Watch</h1>
+        <p class="tagline">A quiet robot that reads Hacker News for you.</p>
+
+        <form id="monitor-form" class="card">
+          <label>What do you care about?</label>
+          <textarea
+            id="prompt"
+            rows="3"
+            placeholder="e.g. AI-agent startup launches"
+            required
+          ></textarea>
+          <label>Check every (minutes)</label>
+          <input id="interval" type="number" min="1" value="30" />
+          <button type="submit">Add monitor</button>
+        </form>
+
+        <h2>Monitors</h2>
+        <ul id="monitors" class="monitors"></ul>
+      </aside>
+
+      <!-- RIGHT: the feed -->
+      <main class="feed-pane">
+        <h2>Feed</h2>
+        <div id="feed" class="feed"></div>
+        <div id="feed-empty" class="empty">
+          No matches yet. Add a monitor and Claude will start filling this in.
+        </div>
+      </main>
+    </div>
+
+    <!-- Swarm live view (hidden until "Dig deeper") -->
+    <div id="swarm-overlay" class="overlay hidden">
+      <div class="modal">
+        <div class="modal-head">
+          <h3 id="swarm-title">Digging deeper…</h3>
+          <button id="swarm-close">✕</button>
+        </div>
+        <div id="swarm-agents" class="agents"></div>
+        <div id="swarm-brief" class="brief hidden">
+          <h4>Combined brief</h4>
+          <div id="swarm-brief-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
