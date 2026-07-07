@@ -10,7 +10,14 @@
 
 const { spawn } = require('child_process');
 
-const MAX_CONCURRENT = 3; // how many `claude -p` processes may run simultaneously
+// Raised from 3 → 5 so a full 4-agent swarm (plus headroom) runs in one wave
+// instead of two. Still bounded so a burst can't spawn unlimited processes.
+const MAX_CONCURRENT = 5; // how many `claude -p` processes may run simultaneously
+
+// Default to Sonnet, not the CLI's default Opus. For "judge these headlines"
+// and short research, Sonnet is noticeably faster and easily good enough.
+// Callers can override per-call with opts.model.
+const DEFAULT_MODEL = 'sonnet';
 
 let running = 0;
 const queue = []; // pending jobs waiting for a free slot
@@ -18,6 +25,7 @@ const queue = []; // pending jobs waiting for a free slot
 // Public entry point. Returns a promise for the final text answer.
 //   opts.stream   — if true, use streaming output and call opts.onChunk(text)
 //   opts.onChunk  — called with incremental text as it arrives (swarm live view)
+//   opts.model    — override the model (defaults to DEFAULT_MODEL)
 //   opts.label    — a human name for logs / the live view
 function runClaude(prompt, opts = {}) {
   return new Promise((resolve, reject) => {
@@ -48,11 +56,12 @@ function execJob(job) {
 
 function runOne({ prompt, opts, resolve, reject }, done) {
   const stream = !!opts.stream;
+  const model = opts.model || DEFAULT_MODEL;
 
   // stream-json gives us live events; plain json gives one final envelope.
   const args = stream
-    ? ['-p', '--output-format', 'stream-json', '--verbose']
-    : ['-p', '--output-format', 'json'];
+    ? ['-p', '--model', model, '--output-format', 'stream-json', '--verbose']
+    : ['-p', '--model', model, '--output-format', 'json'];
 
   const child = spawn('claude', args, { stdio: ['pipe', 'pipe', 'pipe'] });
 

@@ -109,10 +109,12 @@ Here are recent stories as "id: title":
 ${list}
 
 Return ONLY a JSON array of the stories that genuinely match what the user
-cares about. Each element must be {"hnId": <number>, "summary": "<one sentence
-on why it's relevant>"}. If nothing matches, return []. No prose, JSON only.`;
+cares about. Each element must be {"hnId": <number>, "summary": "<why it's
+relevant, max 12 words>"}. If nothing matches, return []. No prose, JSON only.`;
 
-  const raw = await runClaude(prompt); // non-streaming, goes through the queue
+  // Haiku: this is fast headline classification, not deep reasoning — the model
+  // choice here is the single biggest lever on how quickly the feed fills.
+  const raw = await runClaude(prompt, { model: 'haiku' });
   return parseJsonArray(raw);
 }
 
