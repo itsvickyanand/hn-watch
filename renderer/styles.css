@@ -181,6 +181,35 @@ button:hover {
   border-radius: 12px;
   padding: 14px 16px;
 }
+.item .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px 2px 6px;
+  border: 1px solid;
+  border-radius: 999px;
+  margin-bottom: 8px;
+  max-width: 100%;
+}
+.item .badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+.monitor .prompt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.monitor .swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  flex: none;
+}
 .item a.title {
   color: var(--text);
   font-size: 16px;

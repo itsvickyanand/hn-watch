@@ -21,6 +21,7 @@ async function init() {
   window.api.onFeedNew(({ items }) => {
     feed = [...items, ...feed]; // newest first
     renderFeed();
+    renderMonitors(); // refresh the "N in feed" counts
   });
   window.api.onMonitorStatus(({ monitorId, state }) => {
     statusById[monitorId] = state;
@@ -61,13 +62,19 @@ function renderMonitors() {
     const li = document.createElement('li');
     li.className = 'monitor';
     const state = statusById[m.id] || 'idle';
+    const color = monitorColor(m.id);
+    const count = feed.filter((f) => f.monitorId === m.id).length;
     li.innerHTML = `
       <div class="row">
-        <div class="prompt">${escapeHtml(m.prompt)}</div>
+        <div class="prompt">
+          <span class="swatch" style="background:${color}"></span>${escapeHtml(
+            m.prompt
+          )}
+        </div>
         <button class="remove" title="Remove">✕</button>
       </div>
       <div class="meta">
-        <span class="dot ${state}"></span>${state} · every ${m.intervalMinutes}m
+        <span class="dot ${state}"></span>${state} · every ${m.intervalMinutes}m · ${count} in feed
       </div>`;
     li.querySelector('.remove').addEventListener('click', () =>
       removeMonitor(m.id)
@@ -81,9 +88,21 @@ function renderFeed() {
   $('feed-empty').classList.toggle('hidden', feed.length > 0);
   el.innerHTML = '';
   for (const item of feed) {
+    const monitor = monitors.find((m) => m.id === item.monitorId);
+    const label = monitor ? monitor.prompt : '(deleted monitor)';
+    const color = monitorColor(item.monitorId);
+
     const div = document.createElement('div');
     div.className = 'item';
+    // A left accent stripe + a chip both tint to the monitor's colour, so it's
+    // easy to see at a glance which monitor produced each item.
+    div.style.borderLeft = `3px solid ${color}`;
     div.innerHTML = `
+      <div class="badge" style="background:${color}22;color:${color};border-color:${color}55">
+        <span class="badge-dot" style="background:${color}"></span>${escapeHtml(
+          label
+        )}
+      </div>
       <a class="title" href="${item.url}" target="_blank" rel="noreferrer">
         ${escapeHtml(item.title)}
       </a>
@@ -96,6 +115,15 @@ function renderFeed() {
     div.querySelector('.dig').addEventListener('click', () => digDeeper(item));
     el.appendChild(div);
   }
+}
+
+// Give each monitor a stable colour derived from its id, so the same monitor
+// always shows the same hue across restarts.
+function monitorColor(monitorId) {
+  let hash = 0;
+  for (const ch of String(monitorId)) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 70%, 62%)`;
 }
 
 // ---------- swarm ----------
