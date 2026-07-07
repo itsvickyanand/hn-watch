@@ -1,136 +1,110 @@
 # Prompts & Process
 
-## Coding agent used
+## Coding agent
 
-**Claude Code** (Claude Opus) — Anthropic's agentic CLI/IDE coding assistant —
-was used to design, build, debug, and iterate on this app.
+Built with **Claude Code** (Claude Opus), Anthropic's agentic coding assistant.
 
-Note the nice recursion: the app *itself* uses `claude -p` (Claude Code in
-headless mode) as its runtime for both the monitors and the research swarm. So
-Claude Code both **wrote** the app and **runs inside** it.
+A nice bit of recursion: the app *itself* uses `claude -p` (Claude Code in
+headless mode) as its runtime for both the scheduled monitors and the on-demand
+research swarm — so Claude Code both **wrote** this app and **runs inside** it.
 
-The prompts below are the actual messages I sent the agent, in order, kept close
-to verbatim (typos and all) so the process is transparent.
+## How I worked with it
+
+I drove the build through a sequence of decisions and questions rather than one
+big "build me X" prompt — choosing the stack, pressure-testing the architecture
+(background behaviour, API load at scale, brief compliance), then iterating on
+UX. The agent scaffolded the code, explained each module, and debugged real
+environment issues along the way.
+
+The prompts below are the substantive ones, lightly edited for clarity. The full
+unedited history lives in the git commit log.
 
 ---
 
-## 1 — Understanding the brief
+### 1. Stack decision
 
-> first simplify this *(pasted the full HN Watch brief)*
+> I'm strongest in JS / React / Node. Can this be built on that stack instead of
+> Tauri + Rust, or is Rust genuinely necessary here? Walk me through the
+> trade-off.
 
-> i am not understanding it simplyfy further
+→ Chose **Electron + Node.js** to match my skills; the agent flagged the
+deviation from the brief and documented it in the README. The Node main process
+plays the exact role the brief assigns to the Rust layer.
 
-> what is the swarm thing
+### 2. Build
 
-> i want to understand each line and its meaning *(pasted the brief again)*
+> Let's build it. Scaffold the whole app and walk me through each part as you go.
 
-> not like this each line simplified
+→ Produced the full architecture: the `claude -p` runner + shared concurrency
+queue (`src/claude.js`), the monitor scheduler (`src/monitors.js`), the swarm
+orchestrator (`src/swarm.js`), JSON persistence (`src/store.js`), HN fetching
+(`src/hn.js`), tray + notifications (`main.js`), and the UI (`renderer/`).
 
-> this is better but add meaning to terms such as tauri hn watch etc
+### 3. Debugging the first run
 
-## 2 — Tech-stack decision
+> The monitors show an error on every tick — figure out why and fix it.
 
-> got it now lets start to build it but want to know if it can be done using my
-> current knowledge of js react next node express postgres mongodb etc — is rust
-> really necessary
+→ Found two real issues: (a) the **CLI `claude` wasn't logged in** (separate from
+the desktop Claude app) — fixed with `claude auth login`; (b) a **queue bug**
+where `execJob` returned `undefined`, so `pump().finally()` crashed every call.
+Fixed by making it return a promise.
 
-*(Chose Electron + Node.js over Tauri + Rust to match my existing skills. The
-agent flagged this deviates from the brief and documented it in the README.)*
+### 4. Architecture — background behaviour
 
-## 3 — Build
+> If I quit the app, do the monitors keep running in the background, or stop?
 
-*(The agent scaffolded the whole app from this decision: Electron main process,
-the `claude -p` runner + shared concurrency queue, the monitor scheduler, the
-swarm orchestrator, JSON persistence, tray, notifications, and the UI. Built
-incrementally with explanations of each file.)*
+→ Clarified the model: **closing the window** keeps monitors ticking in the tray;
+**quitting** fully stops them (state persists and resumes on relaunch).
 
-## 4 — Git & auth setup
+### 5. Architecture — API load at scale
 
-> git@github.com:itsvickyanand/hn-watch.git push to this repository — i have
-> logged in from the terminal as well check that
+> If there are 50 monitors scheduled at different times, does each tick hit the
+> Hacker News API separately?
 
-> use personal
+> Let's fix that: fetch HN once and cache it for 5 minutes. Any monitor that
+> ticks within that window reuses the cache with zero API calls; only fetch again
+> if the cache is older than 5 minutes.
 
-> do you need claude api key
+→ Added a **shared 5-minute cache with request coalescing** (`src/hn.js`): 50
+monitors now cause ~1 API call per 5 minutes instead of 50. Verified with a test
+(50 concurrent ticks → 1 call).
 
-> so we are all set
+### 6. Brief-compliance audit
 
-## 5 — Debugging the first run
+> Audit our implementation against every point of the brief — no code changes.
+> For each requirement, tell me the file and lines where it's implemented so I
+> can explain the code alongside the feature.
 
-> i ran it but again the same issue *(with screenshots showing "error" monitors)*
+→ Produced a point-by-point mapping of each brief requirement to its file and
+line numbers.
 
-> quit the hn watch and rerun
+### 7. UX iteration
 
-*(Diagnosed two real issues: (a) the CLI `claude` wasn't logged in — separate
-from the desktop Claude app's login; fixed with `claude auth login`; (b) a queue
-bug where `execJob` didn't return a promise, crashing every `claude -p` call.)*
+> New monitors and new feed items should appear at the top of their lists. Add a
+> UI to configure the "dig deeper" research angles. And notifications aren't
+> firing — investigate.
 
-> Login successful.
+→ Newest-first ordering; a settings modal to toggle / edit / add swarm angles
+(persisted); diagnosed macOS notification permissions for unpackaged Electron.
 
-## 6 — Review & polish
+> Add readable timestamps to both the feed items and the monitors.
 
-> perfect what we created so far give me point wise
+→ Relative times ("5m ago") with full-date tooltips, auto-refreshing every 60s.
 
-> map the feeds to the monitor — as of now its hard to identify which feed
-> belongs to which monitor
+### 8. Quit behaviour
 
-> prepare a demo
+> When I quit the app it doesn't actually close.
 
-> where is the tray on my mac i dont know
-
-> when i am quitting the app the app doesn't close
-
-*(Fixed: ⌘Q/menu-quit now fully exits via an app `before-quit` handler, not just
-the tray button.)*
-
-## 7 — Architecture questions
-
-> so if i quit will the monitors and schedules finish or run in the background
-
-> i want to know if there are 50 monitors all scheduled at different times will
-> the fetching happen from api for each call
-
-> yes lets do that — fetch HN api and cache for 5 minutes and fuel all the
-> monitors if they fall in that 5 minute zone with no api calls; if no fresh api
-> call in last 5 minutes just fetch again for the monitor
-
-*(Added a shared 5-minute HN cache with request coalescing so N monitors cause
-~1 API call per 5 min instead of N.)*
-
-## 8 — Brief compliance audit
-
-> check each point of this and tell me if our app stands upon this or not — no
-> code changes please — let me know the file and code where its done each
-> functionality as i want to explain the code along with the feature
-
-*(Produced a point-by-point mapping of the brief to files/line numbers.)*
-
-## 9 — Feature requests
-
-> when new monitor is added add on the top of list not at the bottom — also same
-> with the feeds — also give ui options to change the dig deeper configs — also
-> i am not getting notifications
-
-> i tried send test notification but did not work
-
-*(Diagnosed macOS notification permissions for unpackaged Electron dev apps.)*
-
-> date time still did not appear, notification is fixed
-
-> add time and date in the most readable format of the post and the monitor as
-> well
-
-*(Added relative timestamps — "5m ago" — with full-date tooltips, auto-refresh
-every 60s.)*
+→ ⌘Q / menu-quit was only hiding the window. Fixed with an app `before-quit`
+handler so every quit path fully exits.
 
 ---
 
 ## What the agent handled end-to-end
 
-- Full app architecture and all code (Electron main, `src/*`, renderer)
+- Full architecture and all code
 - The shared concurrency queue — the brief's core "one-per-tick vs many-at-once"
   challenge
-- Debugging real environment issues (CLI auth, a promise bug, macOS tray &
-  notifications, SSH multi-account git)
-- Git hygiene (personal identity, correct SSH key, commits & pushes)
-- README, DEMO.md, and this file
+- Real environment debugging: CLI auth, a promise bug, macOS tray &
+  notifications, multi-account SSH/git
+- Git hygiene, README, DEMO.md, and this file
