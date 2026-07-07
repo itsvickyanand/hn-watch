@@ -39,7 +39,14 @@ function pump() {
 }
 
 // Actually spawn one `claude -p` process for a single job.
-function execJob({ prompt, opts, resolve, reject }) {
+// Returns a promise that settles when the process finishes (so pump() can free
+// the slot). The caller's result is delivered via the job's resolve/reject;
+// `done()` just signals "slot free" to the queue.
+function execJob(job) {
+  return new Promise((done) => runOne(job, done));
+}
+
+function runOne({ prompt, opts, resolve, reject }, done) {
   const stream = !!opts.stream;
 
   // stream-json gives us live events; plain json gives one final envelope.
@@ -93,12 +100,13 @@ function execJob({ prompt, opts, resolve, reject }) {
   child.on('error', (err) => {
     // e.g. `claude` isn't installed / not on PATH
     reject(new Error(`Could not start claude: ${err.message}`));
+    done();
   });
 
   child.on('close', (code) => {
     if (stream) {
       resolve(finalText.trim());
-      return;
+      return done();
     }
     // Non-streaming: parse the single JSON envelope.
     try {
@@ -116,6 +124,7 @@ function execJob({ prompt, opts, resolve, reject }) {
         )
       );
     }
+    done();
   });
 
   // Feed the prompt in via stdin (safer than the command line for long text).
