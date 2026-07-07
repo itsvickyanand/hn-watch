@@ -14,7 +14,7 @@ const fs = require('fs');
 const path = require('path');
 
 let filePath = null;
-let data = { monitors: [], feed: [], seenHnIds: [] };
+let data = { monitors: [], feed: [], seenHnIds: [], swarmConfig: null };
 
 // Called once at startup with Electron's per-user data directory.
 function init(userDataDir) {
@@ -26,6 +26,7 @@ function init(userDataDir) {
     data.monitors ??= [];
     data.feed ??= [];
     data.seenHnIds ??= [];
+    data.swarmConfig ??= null;
   } catch {
     // File doesn't exist yet (first launch) — start empty and create it.
     save();
@@ -45,9 +46,19 @@ function getState() {
 
 // ---- monitors ----
 function addMonitor(monitor) {
-  data.monitors.push(monitor);
+  data.monitors.unshift(monitor); // newest monitor at the top of the list
   save();
   return monitor;
+}
+
+// ---- swarm ("dig deeper") config ----
+function getSwarmConfig() {
+  return data.swarmConfig;
+}
+function setSwarmConfig(cfg) {
+  data.swarmConfig = cfg;
+  save();
+  return cfg;
 }
 
 function removeMonitor(id) {
@@ -95,4 +106,6 @@ module.exports = {
   isNew,
   markSeen,
   addFeedItems,
+  getSwarmConfig,
+  setSwarmConfig,
 };

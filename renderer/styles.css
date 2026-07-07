@@ -164,6 +164,69 @@ button:hover {
 .feed-pane h2 {
   margin-top: 0;
 }
+.feed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 640px;
+}
+.ghost-btn {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.ghost-btn:hover {
+  border-color: var(--accent);
+  filter: none;
+}
+
+/* dig deeper settings modal */
+.angle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+}
+.angle {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.angle.disabled {
+  opacity: 0.5;
+}
+.angle-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.angle-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.angle-instruction {
+  width: 100%;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.add-angle {
+  margin-top: 6px;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+.modal-actions button {
+  padding: 9px 20px;
+}
 .feed {
   display: flex;
   flex-direction: column;

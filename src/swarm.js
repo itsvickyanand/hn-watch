@@ -55,28 +55,34 @@ class SwarmManager extends EventEmitter {
 
   // Kick off a swarm for one feed item. Returns a swarmId immediately; work
   // continues in the background and is reported via events.
-  start(story) {
+  //   angles — optional list of {id, angle, instruction} to use instead of the
+  //            defaults (comes from the user's "dig deeper" settings).
+  start(story, angles) {
+    const useAngles = angles && angles.length ? angles : ANGLES;
     const swarmId = `swarm-${++this.counter}`;
-    this.run(swarmId, story); // fire and forget
-    return { swarmId, angles: ANGLES.map((a) => ({ id: a.id, angle: a.angle })) };
+    this.run(swarmId, story, useAngles); // fire and forget
+    return {
+      swarmId,
+      angles: useAngles.map((a) => ({ id: a.id, angle: a.angle })),
+    };
   }
 
-  async run(swarmId, story) {
+  async run(swarmId, story, angles) {
     const context = `Story: "${story.title}"
 URL: ${story.url}
 Points: ${story.points ?? 0}, Comments: ${story.comments ?? 0}
 ${story.summary ? `Prior summary: ${story.summary}` : ''}`;
 
     // Launch all agents at once. Each resolves to its finished text.
-    const agentRuns = ANGLES.map((a) => this.runAgent(swarmId, a, context));
+    const agentRuns = angles.map((a) => this.runAgent(swarmId, a, context));
     const results = await Promise.allSettled(agentRuns);
 
     // Collect whatever succeeded for the synthesis step.
     const findings = results
       .map((r, i) =>
         r.status === 'fulfilled'
-          ? `## ${ANGLES[i].angle}\n${r.value}`
-          : `## ${ANGLES[i].angle}\n(failed: ${r.reason?.message || 'error'})`
+          ? `## ${angles[i].angle}\n${r.value}`
+          : `## ${angles[i].angle}\n(failed: ${r.reason?.message || 'error'})`
       )
       .join('\n\n');
 

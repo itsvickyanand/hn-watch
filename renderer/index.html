@@ -32,12 +32,47 @@
 
       <!-- RIGHT: the feed -->
       <main class="feed-pane">
-        <h2>Feed</h2>
+        <div class="feed-header">
+          <h2>Feed</h2>
+          <button id="open-settings" class="ghost-btn" title="Dig deeper settings">
+            ⚙ Dig deeper
+          </button>
+        </div>
         <div id="feed" class="feed"></div>
         <div id="feed-empty" class="empty">
           No matches yet. Add a monitor and Claude will start filling this in.
         </div>
       </main>
+    </div>
+
+    <!-- Dig deeper settings (hidden until ⚙ clicked) -->
+    <div id="settings-overlay" class="overlay hidden">
+      <div class="modal">
+        <div class="modal-head">
+          <h3>Dig deeper — research angles</h3>
+          <button id="settings-close">✕</button>
+        </div>
+        <p class="tagline">
+          Each enabled angle becomes one parallel Claude agent. Toggle, edit, or
+          add your own.
+        </p>
+        <div id="angle-list" class="angle-list"></div>
+
+        <div class="add-angle card">
+          <label>Add a custom angle</label>
+          <input id="new-angle-label" placeholder="Label, e.g. Business model" />
+          <textarea
+            id="new-angle-instruction"
+            rows="2"
+            placeholder="Instruction, e.g. How would this make money? Who pays?"
+          ></textarea>
+          <button id="add-angle">Add angle</button>
+        </div>
+
+        <div class="modal-actions">
+          <button id="settings-save">Save</button>
+        </div>
+      </div>
     </div>
 
     <!-- Swarm live view (hidden until "Dig deeper") -->

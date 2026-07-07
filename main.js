@@ -15,7 +15,11 @@ const path = require('path');
 
 const store = require('./src/store');
 const { MonitorManager } = require('./src/monitors');
-const { SwarmManager } = require('./src/swarm');
+const { SwarmManager, ANGLES } = require('./src/swarm');
+
+// Set a real app name so native notifications are attributed to "HN Watch"
+// (otherwise macOS labels them "Electron").
+app.setName('HN Watch');
 
 let win = null;
 let tray = null;
@@ -76,6 +80,14 @@ function createTray() {
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: 'Open HN Watch', click: showWindow },
+      {
+        label: 'Send test notification',
+        click: () =>
+          new Notification({
+            title: 'HN Watch',
+            body: 'Notifications are working ✅',
+          }).show(),
+      },
       { type: 'separator' },
       {
         label: 'Quit HN Watch',
@@ -151,8 +163,22 @@ ipcMain.handle('monitor:remove', (_e, id) => {
 ipcMain.handle('swarm:start', (_e, storyId) => {
   const story = store.getState().feed.find((f) => f.id === storyId);
   if (!story) return { error: 'story not found' };
-  return swarms.start(story); // returns { swarmId, angles }
+  // Use the user's configured angles (enabled ones only); falls back to
+  // defaults inside swarms.start() if none are configured.
+  const cfg = store.getSwarmConfig();
+  const angles = cfg?.angles?.filter((a) => a.enabled);
+  return swarms.start(story, angles); // returns { swarmId, angles }
 });
+
+// Read the current dig-deeper config (or the built-in defaults, all enabled).
+ipcMain.handle('swarm:getConfig', () => {
+  return (
+    store.getSwarmConfig() || {
+      angles: ANGLES.map((a) => ({ ...a, enabled: true })),
+    }
+  );
+});
+ipcMain.handle('swarm:setConfig', (_e, cfg) => store.setSwarmConfig(cfg));
 
 // We manage quitting ourselves via the tray, so don't auto-quit on close.
 app.on('window-all-closed', () => {

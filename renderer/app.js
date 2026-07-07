@@ -37,7 +37,7 @@ $('monitor-form').addEventListener('submit', async (e) => {
   const intervalMinutes = Number($('interval').value) || 30;
   if (!prompt) return;
   const monitor = await window.api.addMonitor({ prompt, intervalMinutes });
-  monitors = [...monitors, monitor];
+  monitors = [monitor, ...monitors]; // newest monitor on top
   $('prompt').value = '';
   renderMonitors();
 });
@@ -185,6 +185,79 @@ $('swarm-close').addEventListener('click', () => {
   $('swarm-overlay').classList.add('hidden');
   currentSwarmId = null;
 });
+
+// ---------- dig deeper settings ----------
+let swarmConfig = { angles: [] };
+
+$('open-settings').addEventListener('click', async () => {
+  swarmConfig = await window.api.getSwarmConfig(); // load latest from disk
+  renderAngles();
+  $('settings-overlay').classList.remove('hidden');
+});
+$('settings-close').addEventListener('click', () =>
+  $('settings-overlay').classList.add('hidden')
+);
+$('settings-save').addEventListener('click', async () => {
+  await window.api.setSwarmConfig(swarmConfig);
+  $('settings-overlay').classList.add('hidden');
+});
+$('add-angle').addEventListener('click', () => {
+  const angle = $('new-angle-label').value.trim();
+  const instruction = $('new-angle-instruction').value.trim();
+  if (!angle || !instruction) return;
+  swarmConfig.angles.push({
+    id: `custom-${Date.now()}`,
+    angle,
+    instruction,
+    enabled: true,
+  });
+  $('new-angle-label').value = '';
+  $('new-angle-instruction').value = '';
+  renderAngles();
+});
+
+function renderAngles() {
+  const list = $('angle-list');
+  list.innerHTML = '';
+  const enabledCount = swarmConfig.angles.filter((a) => a.enabled).length;
+  swarmConfig.angles.forEach((a, idx) => {
+    const row = document.createElement('div');
+    row.className = 'angle' + (a.enabled ? '' : ' disabled');
+    row.innerHTML = `
+      <div class="angle-top">
+        <label class="angle-toggle">
+          <input type="checkbox" ${a.enabled ? 'checked' : ''} />
+          <span class="angle-name">${escapeHtml(a.angle)}</span>
+        </label>
+        <button class="remove" title="Remove">✕</button>
+      </div>
+      <textarea class="angle-instruction" rows="2">${escapeHtml(
+        a.instruction
+      )}</textarea>`;
+    row.querySelector('input[type=checkbox]').addEventListener('change', (e) => {
+      a.enabled = e.target.checked;
+      renderAngles();
+    });
+    row.querySelector('.angle-instruction').addEventListener('input', (e) => {
+      a.instruction = e.target.value;
+    });
+    row.querySelector('.remove').addEventListener('click', () => {
+      swarmConfig.angles.splice(idx, 1);
+      renderAngles();
+    });
+    list.appendChild(row);
+  });
+
+  // Footer note: swarm size = number of enabled angles.
+  const note = document.createElement('div');
+  note.className = 'meta';
+  note.style.marginTop = '4px';
+  note.textContent =
+    enabledCount === 0
+      ? '⚠ No angles enabled — the swarm will use the built-in defaults.'
+      : `${enabledCount} agent${enabledCount > 1 ? 's' : ''} will run in parallel per dig.`;
+  list.appendChild(note);
+}
 
 // ---------- util ----------
 function escapeHtml(s) {

@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('api', {
   addMonitor: (monitor) => ipcRenderer.invoke('monitor:add', monitor),
   removeMonitor: (id) => ipcRenderer.invoke('monitor:remove', id),
   startSwarm: (storyId) => ipcRenderer.invoke('swarm:start', storyId),
+  getSwarmConfig: () => ipcRenderer.invoke('swarm:getConfig'),
+  setSwarmConfig: (cfg) => ipcRenderer.invoke('swarm:setConfig', cfg),
 
   // ---- push (main tells the renderer something happened) ----
   onFeedNew: (cb) => ipcRenderer.on('feed:new', (_e, data) => cb(data)),
