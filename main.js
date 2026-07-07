@@ -78,12 +78,9 @@ function createTray() {
       { label: 'Open HN Watch', click: showWindow },
       { type: 'separator' },
       {
-        label: 'Quit',
-        click: () => {
-          isQuitting = true;
-          monitors.stopAll();
-          app.quit();
-        },
+        label: 'Quit HN Watch',
+        accelerator: 'Command+Q',
+        click: () => app.quit(), // before-quit sets the flag + stops monitors
       },
     ])
   );
@@ -160,4 +157,12 @@ ipcMain.handle('swarm:start', (_e, storyId) => {
 // We manage quitting ourselves via the tray, so don't auto-quit on close.
 app.on('window-all-closed', () => {
   /* keep running in the tray */
+});
+
+// Any real quit path — ⌘Q, the app menu, or the tray's Quit — fires this first.
+// Setting the flag here lets the window's 'close' handler actually close
+// (instead of hiding), so the app fully exits no matter how you quit it.
+app.on('before-quit', () => {
+  isQuitting = true;
+  monitors.stopAll();
 });
