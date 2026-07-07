@@ -25,9 +25,21 @@ async function init() {
   });
   window.api.onMonitorStatus(({ monitorId, state }) => {
     statusById[monitorId] = state;
+    // A finished tick means the monitor just checked — stamp it so the
+    // "last checked" time stays current without a backend round-trip.
+    if (state === 'idle') {
+      const m = monitors.find((x) => x.id === monitorId);
+      if (m) m.lastRunAt = Date.now();
+    }
     renderMonitors();
   });
   window.api.onSwarmEvent(handleSwarmEvent);
+
+  // Relative times ("5m ago") go stale — re-render every 60s to keep them live.
+  setInterval(() => {
+    renderFeed();
+    renderMonitors();
+  }, 60 * 1000);
 }
 
 // ---------- create / remove monitors ----------
@@ -75,6 +87,11 @@ function renderMonitors() {
       </div>
       <div class="meta">
         <span class="dot ${state}"></span>${state} · every ${m.intervalMinutes}m · ${count} in feed
+      </div>
+      <div class="meta" title="Created ${fullDate(m.createdAt)}">
+        added ${timeAgo(m.createdAt)}${
+      m.lastRunAt ? ` · last checked ${timeAgo(m.lastRunAt)}` : ''
+    }
       </div>`;
     li.querySelector('.remove').addEventListener('click', () =>
       removeMonitor(m.id)
@@ -110,6 +127,9 @@ function renderFeed() {
       <div class="footer">
         <span>▲ ${item.points ?? 0}</span>
         <span>💬 ${item.comments ?? 0}</span>
+        <span class="time" title="${fullDate(item.seenAt)}">🕒 ${timeAgo(
+          item.seenAt
+        )}</span>
         <button class="dig">Dig deeper</button>
       </div>`;
     div.querySelector('.dig').addEventListener('click', () => digDeeper(item));
@@ -257,6 +277,38 @@ function renderAngles() {
       ? '⚠ No angles enabled — the swarm will use the built-in defaults.'
       : `${enabledCount} agent${enabledCount > 1 ? 's' : ''} will run in parallel per dig.`;
   list.appendChild(note);
+}
+
+// ---------- time formatting ----------
+// Short, readable relative time for the feed ("just now", "5m ago", "3h ago").
+function timeAgo(ts) {
+  if (!ts) return '';
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 45) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(ts).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+// Full, human date for tooltips: "Tue, Jul 7, 2026, 3:04 PM".
+function fullDate(ts) {
+  if (!ts) return '';
+  return new Date(ts).toLocaleString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 // ---------- util ----------
